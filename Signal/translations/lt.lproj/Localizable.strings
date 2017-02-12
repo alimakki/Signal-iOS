@@ -14,7 +14,7 @@
 "ACTION_REQUIRED_TITLE" = "Reikalingas veiksmas";
 
 /* Alert body when contacts disabled */
-"ADDRESSBOOK_RESTRICTED_ALERT_BODY" = "Signal requires access to your contacts. Access to contacts is restricted. Signal will close. You can disable the restriction temporarily to let Signal access your contacts by going the Settings app >> General >> Restrictions >> Contacts >> Allow Changes.";
+"ADDRESSBOOK_RESTRICTED_ALERT_BODY" = "Signal reikalauja prieigos prie jūsų kontaktų. Prieiga prie kontaktų yra apribota. Signal bus užverta. Tam, kad leistumėte Signal prieigą prie savo kontaktų, jūs galite laikinai išjungti apribojimą, pereidami į Nustatymų (angl. Settings) programėlę >> Bendra (angl. General) >> Apribojimai (angl. Restrictions) >> Kontaktai (angl. Contacts) >> Leisti pakeitimus (angl. Allow Changes).";
 
 /* No comment provided by engineer. */
 "ADDRESSBOOK_RESTRICTED_ALERT_BUTTON" = "Užverti";
@@ -39,6 +39,9 @@
 
 /* No comment provided by engineer. */
 "APN_MESSAGE_IN_GROUP_DETAILED" = "%@ in group %@: %@";
+
+/* Name of application */
+"APPLICATION_NAME" = "Signal";
 
 /* Pressing this button moves a thread from the inbox to the archive */
 "ARCHIVE_ACTION" = "Archyvuoti";
@@ -65,12 +68,21 @@
 "ATTACHMENT_QUEUED" = "New attachment queued for retrieval.";
 
 /* No comment provided by engineer. */
-"AUDIO_PERMISSION_MESSAGE" = "Signal requires access to your microphone to work properly. You can restore the permission in the Settings app >> Privacy >> Microphone >> Signal";
+"AUDIO_PERMISSION_MESSAGE" = "Tam, kad tinkamai veiktų, Signal reikalauja prieigos prie jūsų mikrofono. Jūs galite suteikti šį leidimą Nustatymų (angl. Settings) programėlėje >> Privatumas (angl. Privacy) >> Mikrofonas (angl. Microphone) >> Signal";
+
+/* Title for call interstitial view */
+"CALL_INTERSTITIAL_CALLING_LABEL" = "Calling...";
 
 /* Accessibilty label for placing call button */
 "CALL_LABEL" = "Skambinti";
 
-/* No comment provided by engineer. */
+/* Call setup status label after outgoing call times out */
+"CALL_SCREEN_STATUS_NO_ANSWER" = "No Answer.";
+
+/* embeds {{Call Status}} in call screen label. For ongoing calls, {{Call Status}} is a seconds timer like 01:23, otherwise {{Call Status}} is a short text like 'Ringing', 'Busy', or 'Failed Call' */
+"CALL_STATUS_FORMAT" = "Signal %@";
+
+/* notification action */
 "CALLBACK_BUTTON_TITLE" = "Perskambinti";
 
 /* Activity Sheet label */
@@ -113,7 +125,7 @@
 "COUNTRYCODE_SELECT_TITLE" = "Pasirinkite valstybės kodą";
 
 /* {{number of days}} embedded in strings, e.g. 'Alice updated disappearing messages expiration to {{5 days}}'. See other *_TIME_AMOUNT strings */
-"DAYS_TIME_AMOUNT" = "%u days";
+"DAYS_TIME_AMOUNT" = "%u dienų";
 
 /* No comment provided by engineer. */
 "DELIVERED_MESSAGE_TEXT" = "Pristatyta";
@@ -179,10 +191,10 @@
 "EMPTY_INBOX_FIRST_TITLE" = "Atlikta. Atlikta. Atlikta.";
 
 /* No comment provided by engineer. */
-"EMPTY_INBOX_TEXT" = "None. Zero. Zilch. Nada.";
+"EMPTY_INBOX_TEXT" = "Nieko nėra. Tuščia.";
 
 /* No comment provided by engineer. */
-"EMPTY_INBOX_TITLE" = "Squeaky Freaking Clean.";
+"EMPTY_INBOX_TITLE" = "Visiškai tuščia.";
 
 /* No comment provided by engineer. */
 "END_CALL_BAD_INTERACTION_WITH_SERVER" = "Serveris patyrė nesėkmę!";
@@ -220,14 +232,14 @@
 /* No comment provided by engineer. */
 "END_CALL_REPLACED_BY_NEXT" = "You Made Another Call.";
 
-/* No comment provided by engineer. */
-"END_CALL_RESPONDER_IS_BUSY" = "Užimta...";
+/* Call setup status label */
+"END_CALL_RESPONDER_IS_BUSY" = "Užimta.";
 
 /* No comment provided by engineer. */
 "END_CALL_STALE_SESSION" = "Missed the Call.";
 
-/* No comment provided by engineer. */
-"END_CALL_UNCATEGORIZED_FAILURE" = "Klientas patyrė nesėkmę!";
+/* Call setup status label */
+"END_CALL_UNCATEGORIZED_FAILURE" = "Skambutis nepavyko.";
 
 /* Generic notice when message failed to send. */
 "ERROR_DESCRIPTION_CLIENT_SENDING_FAILURE" = "Nepavyko išsiųsti žinutę.";
@@ -236,13 +248,16 @@
 "ERROR_DESCRIPTION_NO_INTERNET" = "Signal nepavyko prisijungti prie interneto. Prašome pabandyti iš kito bevielio (WiFi) tinklo arba naudoti mobiliuosius duomenis.";
 
 /* Error message when attempting to send message */
-"ERROR_DESCRIPTION_SENDING_UNAUTHORIZED" = "Your device is no longer registered for your phone number. You must remove and reinstall Signal.";
+"ERROR_DESCRIPTION_SENDING_UNAUTHORIZED" = "Jūsų įrenginys daugiau nebėra priregistruotas prie jūsų telefono numerio. Jūs privalote pašalinti ir iš naujo įdiegti Signal.";
 
 /* Generic server error */
 "ERROR_DESCRIPTION_SERVER_FAILURE" = "Serverio klaida. Prašome vėliau bandyti dar kartą.";
 
+/* Worst case generic error message */
+"ERROR_DESCRIPTION_UNKNOWN_ERROR" = "Įvyko nežinoma klaida.";
+
 /* Error message when attempting to send message */
-"ERROR_DESCRIPTION_UNREGISTERED_RECIPIENT" = "Gavėjas daugiau nebėra Signal naudotojas.";
+"ERROR_DESCRIPTION_UNREGISTERED_RECIPIENT" = "Kontaktas nėra Signal naudotojas.";
 
 /* No comment provided by engineer. */
 "ERROR_MESSAGE_DUPLICATE_MESSAGE" = "Gauta dviguba žinutė.";
@@ -272,10 +287,10 @@
 "ERROR_WAS_DETECTED_TITLE" = "O, ne!";
 
 /* during registration */
-"EXISTING_USER_REGISTRATION_ALERT_BODY" = "At this time Signal can only be active on one mobile device per phone number.";
+"EXISTING_USER_REGISTRATION_ALERT_BODY" = "Šiuo metu programėlė Signal vienam telefono numeriui gali būti aktyvi tik viename mobiliajame įrenginyje.";
 
 /* during registration, embeds {{device type}}, e.g. \"iPhone\" or \"iPad\" */
-"EXISTING_USER_REGISTRATION_ALERT_TITLE" = "Activating this %@ will disable Signal on any other device currently associated with this phone number.";
+"EXISTING_USER_REGISTRATION_ALERT_TITLE" = "Šio %@ aktyvavimas išjungs Signal bet kuriame kitame įrenginyje, kuris esamu metu yra susietas su šiuo telefono numeriu.";
 
 /* action sheet header when re-sending message which failed because of too many attempts */
 "FAILED_SENDING_BECAUSE_RATE_LIMIT" = "Per daug nesėkmių su šiuo kontaktu. Prašome po kurio laiko pabandyti dar kartą.";
@@ -353,13 +368,16 @@
 "IN_CALL_TALKING" = "Apsaugotas. Aktyvus.";
 
 /* Call setup status label */
-"IN_CALL_TERMINATED" = "Atlikta.";
+"IN_CALL_TERMINATED" = "Call Ended.";
 
-/* No comment provided by engineer. */
+/* notification body */
 "INCOMING_CALL" = "Gaunamasis skambutis";
 
-/* No comment provided by engineer. */
+/* notification body */
 "INCOMING_CALL_FROM" = "Gaunamasis skambutis nuo %@";
+
+/* No comment provided by engineer. */
+"INCOMING_INCOMPLETE_CALL" = "Incomplete incoming call from";
 
 /* Text for button at the top of the contact picker */
 "INVITE_FRIENDS_CONTACT_TABLE_BUTTON" = "Pakviesti draugus į Signal";
@@ -383,7 +401,7 @@
 "LEAVE_GROUP_ACTION" = "Išeiti iš grupės";
 
 /* report an invalid linking code */
-"LINK_DEVICE_INVALID_CODE_BODY" = "This QR code is not valid, make sure you are scanning the QR code displayed on the device you want to link.";
+"LINK_DEVICE_INVALID_CODE_BODY" = "Šis QR kodas yra neteisingas, įsitikinkite, kad skenuojate įrenginio, kurį norite susieti, ekrane esantį QR kodą.";
 
 /* report an invalid linking code */
 "LINK_DEVICE_INVALID_CODE_TITLE" = "Įrenginio susiejimas nepavyko";
@@ -439,23 +457,31 @@
 /* {{number of minutes}} embedded in strings, e.g. 'Alice updated disappearing messages expiration to {{5 minutes}}'. See other *_TIME_AMOUNT strings */
 "MINUTES_TIME_AMOUNT" = "%u minutes";
 
-/* No comment provided by engineer. */
+/* notification title */
 "MISSED_CALL" = "Praleistas skambutis";
 
-/* Alert body */
-"MISSING_CAMERA_PERMISSION_MESSAGE" = "Jūs anksčiau atmetėte leidimą programėlei Signal naudoti jūsų kamerą. Norėdami tęsti, atnaujinkite savo sistemos nustatymus.";
+/* Alert body
+   Alert body when camera is not authorized */
+"MISSING_CAMERA_PERMISSION_MESSAGE" = "Norint skambinti su vaizdu, Signal reikia prieigos prie jūsų kameros. Jūs galite suteikti šį leidimą Nustatymų (angl. Settings) programėlėje >> Privatumas (angl. Privacy) >> Kamera (angl. Camera) >> Signal";
 
-/* Alert title */
+/* Alert title
+   Alert title when camera is not authorized */
 "MISSING_CAMERA_PERMISSION_TITLE" = "Signal reikalinga prieiga prie jūsų kameros.";
 
-/* No comment provided by engineer. */
+/* notification title. Embeds {{Caller's Name}} */
 "MSGVIEW_MISSED_CALL" = "Praleistas skambutis nuo %@.";
 
 /* No comment provided by engineer. */
 "MSGVIEW_RECEIVED_CALL" = "You received a call from %@.";
 
 /* No comment provided by engineer. */
+"MSGVIEW_THEY_TRIED_TO_CALL_YOU" = "%@ tried to call you.";
+
+/* No comment provided by engineer. */
 "MSGVIEW_YOU_CALLED" = "You called %@.";
+
+/* No comment provided by engineer. */
+"MSGVIEW_YOU_TRIED_TO_CALL" = "You tried to call %@.";
 
 /* No comment provided by engineer. */
 "MULTIDEVICE_PAIRING_MAX_DESC" = "Jūs negalite suporuoti daugiau įrenginių.";
@@ -481,6 +507,9 @@
 /* No comment provided by engineer. */
 "NETWORK_STATUS_TEXT" = "You can check your network status by looking at the colored bar above your inbox.";
 
+/* Text for button to start a new conversation with a non-contact */
+"NEW_CONVERSATION_FOR_NON_CONTACT_FORMAT" = "Naujas pokalbis su %@";
+
 /* Action Sheet title prompting the user for a group avatar */
 "NEW_GROUP_ADD_PHOTO_ACTION" = "Set Group Photo";
 
@@ -492,6 +521,9 @@
 
 /* No comment provided by engineer. */
 "NEW_GROUP_REQUEST_ADDPEOPLE" = "Pridėti žmones";
+
+/* Label for a button that lets users search for contacts by phone number */
+"NO_CONTACTS_SEARCH_BY_PHONE_NUMBER" = "Rasti kontaktus pagal telefono numerį";
 
 /* No comment provided by engineer. */
 "NOTIFICATION_SEND_FAILED" = "Nepavyko išsiųsti jūsų žinutės kontaktui %@.";
@@ -536,7 +568,7 @@
 "OUTGOING_CALL" = "Išsiunčiamasis skambutis";
 
 /* No comment provided by engineer. */
-"PHONE_NEEDS_UNLOCK" = "Jūsų iPhone turi būti atrakintas, kad būtų gautos naujos žinutės.";
+"OUTGOING_INCOMPLETE_CALL" = "Incomplete outgoing call";
 
 /* Alert body when verifying with {{contact name}} */
 "PRIVACY_VERIFICATION_FAILED_I_HAVE_WRONG_KEY_FOR_THEM" = "Tai neatrodo kaip jūsų saugumo numeris, skirtas %@. Ar tikrai tvirtinate teisingą kontaktą?";
@@ -587,7 +619,7 @@
 "QUESTIONMARK_PUNCTUATION" = "?";
 
 /* No comment provided by engineer. */
-"RATING_MSG" = "If you enjoy using Signal to have private conversations, you can support our project by rating it. It won't take more than a minute, and will help others find some privacy.";
+"RATING_MSG" = "Jeigu jūs mėgaujatės, naudodami Signal privatiems pokalbiams, jūs galite palaikyti mūsų projektą, jį įvertindami. Tai neužtruks ilgiau nei minutę ir taip padėsite kitiems atrasti privatumą.";
 
 /* No comment provided by engineer. */
 "RATING_RATE" = "Įvertinkite Signal";
@@ -650,16 +682,16 @@
 "REGISTRATION_VERIFICATION_FAILED_TITLE" = "Patvirtinimas nepavyko";
 
 /* Alert body, during registration */
-"REGISTRATION_VERIFICATION_FAILED_WRONG_CODE_DESCRIPTION" = "The numbers you submitted don't match what we sent. Want to double check?";
+"REGISTRATION_VERIFICATION_FAILED_WRONG_CODE_DESCRIPTION" = "Jūsų pateikti skaičiai nesutampa su tais, kuriuos mes išsiuntėme. Gal norėtumėte patikrinti dar kartą?";
 
 /* No comment provided by engineer. */
-"REGISTRATION_VERIFY_DEVICE" = "Activate This Device";
+"REGISTRATION_VERIFY_DEVICE" = "Aktyvuoti šį įrenginį";
 
 /* No comment provided by engineer. */
 "REJECT_CALL_BUTTON_TITLE" = "Atmesti";
 
 /* No comment provided by engineer. */
-"RELAY_REGISTERED_ERROR_RECOVERY" = "The phone number you are trying to register has already been registered on another server, please unregister from there and try again.";
+"RELAY_REGISTERED_ERROR_RECOVERY" = "Telefono numeris, kurį bandote užregistruoti jau buvo užregistruotas kitame serveryje, prašome jį iš ten išregistruoti ir bandyti dar kartą.";
 
 /* No comment provided by engineer. */
 "REREGISTER_FOR_PUSH" = "Re-register for push notifications";
@@ -700,8 +732,8 @@
 /* Alert body after invite succeeded */
 "SEND_INVITE_SUCCESS" = "Jūs pakvietėte savo draugą naudotis Signal!";
 
-/* No comment provided by engineer. */
-"SEND_SMS_BUTTON" = "Kam siųsti SMS: ";
+/* Text for button to send a Signal invite via SMS. %@ is placeholder for the receipient's phone number. */
+"SEND_INVITE_VIA_SMS_BUTTON_FORMAT" = "Send Invite via SMS to: %@";
 
 /* No comment provided by engineer. */
 "SEND_SMS_CONFIRM_TITLE" = "Pakviesti draugą, naudojant nesaugiąją SMS?";
@@ -712,6 +744,9 @@
 /* Navbar title */
 "SETTINGS_ABOUT" = "Apie";
 
+/* Short table cell label */
+"SETTINGS_ADVANCED_CALLKIT_TITLE" = "Naudoti CallKit";
+
 /* No comment provided by engineer. */
 "SETTINGS_ADVANCED_DEBUGLOG" = "Įjungti derinimo žurnalą";
 
@@ -720,6 +755,15 @@
 
 /* No comment provided by engineer. */
 "SETTINGS_ADVANCED_TITLE" = "Išplėstiniai";
+
+/* This setting is used to switch between new-style WebRTC calling and old-style RedPhone calling. */
+"SETTINGS_ADVANCED_WEBRTC" = "Enable Video Calling (Beta)";
+
+/* The message of the alert shown when updates to the WebRTC property fail. */
+"SETTINGS_ADVANCED_WEBRTC_FAILED_MESSAGE" = "Nepavyko atnaujinti jūsų nuostatų.";
+
+/* The title of the alert shown when updates to the WebRTC property fail. */
+"SETTINGS_ADVANCED_WEBRTC_FAILED_TITLE" = "Klaida";
 
 /* User settings section footer, a detailed explanation */
 "SETTINGS_BLOCK_ON_IDENITY_CHANGE_DETAIL" = "Reikalauja jūsų patvirtinimo, prieš susisiekiant su kuo nors, kas turi naują saugumo numerį, dažniausiai, dėl Signal įdiegimo iš naujo.";
@@ -743,7 +787,7 @@
 "SETTINGS_DELETE_HISTORYLOG_CONFIRMATION_BUTTON" = "I'm sure.";
 
 /* No comment provided by engineer. */
-"SETTINGS_HELP_HEADER" = "Help";
+"SETTINGS_HELP_HEADER" = "Pagalba";
 
 /* Section header */
 "SETTINGS_HISTORYLOG_TITLE" = "Istorijos žurnalas";
@@ -755,7 +799,7 @@
 "SETTINGS_INVITE_TITLE" = "Invite Your Friends";
 
 /* content of tweet when inviting via twitter */
-"SETTINGS_INVITE_TWITTER_TEXT" = "You can reach me using Signal by @WhisperSystems, get it now.";
+"SETTINGS_INVITE_TWITTER_TEXT" = "Jūs galite su manimi susisiekti, naudodami Signal iš @WhisperSystems, gaukite programėlę dabar.";
 
 /* Title for settings activity */
 "SETTINGS_NAV_BAR_TITLE" = "Nustatymai";
@@ -774,6 +818,12 @@
 
 /* No comment provided by engineer. */
 "SETTINGS_SCREEN_SECURITY_DETAIL" = "Neleidžia Signal peržiūroms atsirasti programėlių perjungiklyje.";
+
+/* Settings table section footer. */
+"SETTINGS_SECTION_CALL_KIT_DESCRIPTION" = "CallKit leidžia atsiliepti į skambučius tiesiai iš jūsų užrakinto ekrano. Turėkite omenyje, kad naudojant CallKit, Apple sinchronizuoja kai kuriuos skambučio metaduomenis į jūsų iCloud paskyrą.";
+
+/* settings topic header for table section */
+"SETTINGS_SECTION_TITLE_CALLING" = "Calling";
 
 /* Section header */
 "SETTINGS_SECURITY_TITLE" = "Ekrano saugumas";
@@ -797,16 +847,16 @@
 "SHOW_SAFETY_NUMBER_ACTION" = "Rodyti naują saugumo numerį";
 
 /* {{1 day}} embedded in strings, e.g. 'Alice updated disappearing messages expiration to {{1 day}}'. See other *_TIME_AMOUNT strings */
-"SINGLE_DAY_TIME_AMOUNT" = "%u day";
+"SINGLE_DAY_TIME_AMOUNT" = "%u diena(-os)";
 
 /* {{1 hour}} embedded in strings, e.g. 'Alice updated disappearing messages expiration to {{1 hour}}'. See other *_TIME_AMOUNT strings */
-"SINGLE_HOUR_TIME_AMOUNT" = "%u hour";
+"SINGLE_HOUR_TIME_AMOUNT" = "%u valanda(-ų)";
 
 /* {{1 minute}} embedded in strings, e.g. 'Alice updated disappearing messages expiration to {{1 minute}}'. See other *_TIME_AMOUNT strings */
-"SINGLE_MINUTE_TIME_AMOUNT" = "%u minute";
+"SINGLE_MINUTE_TIME_AMOUNT" = "%u minutė(-ių)";
 
 /* {{1 week}} embedded in strings, e.g. 'Alice updated disappearing messages expiration to {{1 week}}'. See other *_TIME_AMOUNT strings */
-"SINGLE_WEEK_TIME_AMOUNT" = "%u week";
+"SINGLE_WEEK_TIME_AMOUNT" = "%u savaitė(-ių)";
 
 /* body sent to contacts when inviting to Install Signal */
 "SMS_INVITE_BODY" = "Siūlau tau įdiegti Signal! Štai čia yra nuoroda:";
@@ -825,6 +875,9 @@
 
 /* No comment provided by engineer. */
 "TXT_DELETE_TITLE" = "Ištrinti";
+
+/* Alert Title */
+"UNABLE_TO_PLACE_CALL" = "Unable to place call.";
 
 /* Pressing this button moves an archived thread from the archive back to the inbox */
 "UNARCHIVE_ACTION" = "Nebearchyvuoti";
@@ -869,7 +922,7 @@
 "UPLOADING_MESSAGE_TEXT" = "Įkeliama...";
 
 /* button text during registration to make corrections to your submitted phone number */
-"VERIFICATION_CHALLENGE_CHANGE_NUMBER" = "Change Number";
+"VERIFICATION_CHALLENGE_CHANGE_NUMBER" = "Pakeisti numerį";
 
 /* Text field placeholder for SMS verification code during registration */
 "VERIFICATION_CHALLENGE_DEFAULT_TEXT" = "Patvirtinimo kodas";

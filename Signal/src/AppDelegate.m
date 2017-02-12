@@ -17,7 +17,6 @@
 #import "Release.h"
 #import "Signal-Swift.h"
 #import "TSMessagesManager.h"
-#import "TSPreKeyManager.h"
 #import "TSSocketManager.h"
 #import "TextSecureKitEnv.h"
 #import "VersionMigrations.h"
@@ -25,10 +24,13 @@
 #import <PastelogKit/Pastelog.h>
 #import <PromiseKit/AnyPromise.h>
 #import <SignalServiceKit/OWSDisappearingMessagesJob.h>
-#import <SignalServiceKit/OWSDispatch.h>
 #import <SignalServiceKit/OWSIncomingMessageReadObserver.h>
 #import <SignalServiceKit/OWSMessageSender.h>
 #import <SignalServiceKit/TSAccountManager.h>
+#import <SignalServiceKit/TSPreKeyManager.h>
+
+@import WebRTC;
+@import Intents;
 
 NSString *const AppDelegateStoryboardMain = @"Main";
 NSString *const AppDelegateStoryboardRegistration = @"Registration";
@@ -82,6 +84,13 @@ static NSString *const kURLHostVerifyPrefix             = @"verify";
     }
 
     DDLogWarn(@"%@ application: didFinishLaunchingWithOptions.", self.tag);
+
+    // Set the seed the generator for rand().
+    //
+    // We should always use arc4random() instead of rand(), but we
+    // still want to ensure that any third-party code that uses rand()
+    // gets random values.
+    srand((unsigned int)time(NULL));
 
     // XXX - careful when moving this. It must happen before we initialize TSStorageManager.
     [self verifyDBKeysAvailableBeforeBackgroundLaunch];
@@ -145,12 +154,10 @@ static NSString *const kURLHostVerifyPrefix             = @"verify";
             DDLogWarn(@"The app was launched in an unknown way");
         }
 
-        OWSAccountManager *accountManager =
-            [[OWSAccountManager alloc] initWithTextSecureAccountManager:[TSAccountManager sharedInstance]
-                                                 redPhoneAccountManager:[RPAccountManager sharedInstance]];
+        RTCInitializeSSL();
 
         [OWSSyncPushTokensJob runWithPushManager:[PushManager sharedManager]
-                                  accountManager:accountManager
+                                  accountManager:[Environment getCurrent].accountManager
                                      preferences:[Environment preferences]].then(^{
             DDLogDebug(@"%@ Successfully ran syncPushTokensJob.", self.tag);
         }).catch(^(NSError *_Nonnull error) {
@@ -171,6 +178,7 @@ static NSString *const kURLHostVerifyPrefix             = @"verify";
             gesture.numberOfTapsRequired = 8;
             [self.window addGestureRecognizer:gesture];
         });
+        RTCInitializeSSL();
     }];
 
     return YES;
@@ -180,9 +188,13 @@ static NSString *const kURLHostVerifyPrefix             = @"verify";
     // Encryption/Descryption mutates session state and must be synchronized on a serial queue.
     [SessionCipher setSessionCipherDispatchQueue:[OWSDispatch sessionCipher]];
 
-    [TextSecureKitEnv sharedEnv].contactsManager = [Environment getCurrent].contactsManager;
+    TextSecureKitEnv *sharedEnv =
+        [[TextSecureKitEnv alloc] initWithCallMessageHandler:[Environment getCurrent].callMessageHandler
+                                             contactsManager:[Environment getCurrent].contactsManager
+                                        notificationsManager:[Environment getCurrent].notificationsManager];
+    [TextSecureKitEnv setSharedEnv:sharedEnv];
+
     [[TSStorageManager sharedManager] setupDatabase];
-    [TextSecureKitEnv sharedEnv].notificationsManager = [[NotificationsManager alloc] init];
 
     OWSMessageSender *messageSender =
         [[OWSMessageSender alloc] initWithNetworkManager:[Environment getCurrent].networkManager
@@ -272,6 +284,8 @@ static NSString *const kURLHostVerifyPrefix             = @"verify";
                                            }];
     
     [self removeScreenProtection];
+
+    [TSPreKeyManager checkPreKeysIfNecessary];
 }
 
 - (void)applicationWillResignActive:(UIApplication *)application {
@@ -321,6 +335,128 @@ static NSString *const kURLHostVerifyPrefix             = @"verify";
                                                                           }];
     }
 }
+
+/**
+ * Among other things, this is used by "call back" callkit dialog and calling from native contacts app.
+ */
+- (BOOL)application:(UIApplication *)application continueUserActivity:(nonnull NSUserActivity *)userActivity restorationHandler:(nonnull void (^)(NSArray * _Nullable))restorationHandler
+{
+    if ([userActivity.activityType isEqualToString:@"INStartVideoCallIntent"]) {
+        if (!SYSTEM_VERSION_GREATER_THAN_OR_EQUAL_TO(10, 0)) {
+            DDLogError(@"%@ unexpectedly received INStartVideoCallIntent pre iOS10", self.tag);
+            return NO;
+        }
+
+        DDLogInfo(@"%@ got start video call intent", self.tag);
+
+        INInteraction *interaction = [userActivity interaction];
+        INIntent *intent = interaction.intent;
+
+        if (![intent isKindOfClass:[INStartVideoCallIntent class]]) {
+            DDLogError(@"%@ unexpected class for start call video: %@", self.tag, intent);
+            return NO;
+        }
+        INStartVideoCallIntent *startCallIntent = (INStartVideoCallIntent *)intent;
+        NSString *_Nullable handle = startCallIntent.contacts.firstObject.personHandle.value;
+        if (!handle) {
+            DDLogWarn(@"%@ unable to find handle in startCallIntent: %@", self.tag, startCallIntent);
+            return NO;
+        }
+
+        if ([Environment getCurrent].phoneManager.hasOngoingRedphoneCall) {
+            DDLogWarn(@"%@ ignoring INStartVideoCallIntent due to ongoing RedPhone call.", self.tag);
+            return NO;
+        }
+
+        // This intent can be received from more than one user interaction.
+        //
+        // * It can be received if the user taps the "video" button in the CallKit UI for an
+        //   an ongoing call.  If so, the correct response is to try to activate the local
+        //   video for that call.
+        // * It can be received if the user taps the "video" button for a contact in the
+        //   contacts app.  If so, the correct response is to try to initiate a new call
+        //   to that user - unless there already is another call in progress.
+        if ([Environment getCurrent].callService.call != nil) {
+            if ([handle isEqualToString:[Environment getCurrent].callService.call.remotePhoneNumber]) {
+                DDLogWarn(@"%@ trying to upgrade ongoing call to video.", self.tag);
+                [[Environment getCurrent].callService handleCallKitStartVideo];
+                return YES;
+            } else {
+                DDLogWarn(
+                    @"%@ ignoring INStartVideoCallIntent due to ongoing WebRTC call with another party.", self.tag);
+                return NO;
+            }
+        }
+
+        OutboundCallInitiator *outboundCallInitiator = [Environment getCurrent].outboundCallInitiator;
+        OWSAssert(outboundCallInitiator);
+        return [outboundCallInitiator initiateCallWithHandle:handle];
+    } else if ([userActivity.activityType isEqualToString:@"INStartAudioCallIntent"]) {
+
+        if (!SYSTEM_VERSION_GREATER_THAN_OR_EQUAL_TO(10, 0)) {
+            DDLogError(@"%@ unexpectedly received INStartAudioCallIntent pre iOS10", self.tag);
+            return NO;
+        }
+
+        DDLogInfo(@"%@ got start audio call intent", self.tag);
+
+        INInteraction *interaction = [userActivity interaction];
+        INIntent *intent = interaction.intent;
+
+        if (![intent isKindOfClass:[INStartAudioCallIntent class]]) {
+            DDLogError(@"%@ unexpected class for start call audio: %@", self.tag, intent);
+            return NO;
+        }
+        INStartAudioCallIntent *startCallIntent = (INStartAudioCallIntent *)intent;
+        NSString *_Nullable handle = startCallIntent.contacts.firstObject.personHandle.value;
+        if (!handle) {
+            DDLogWarn(@"%@ unable to find handle in startCallIntent: %@", self.tag, startCallIntent);
+            return NO;
+        }
+
+        if ([Environment getCurrent].phoneManager.hasOngoingRedphoneCall) {
+            DDLogWarn(@"%@ ignoring INStartAudioCallIntent due to ongoing RedPhone call.", self.tag);
+            return NO;
+        }
+        if ([Environment getCurrent].callService.call != nil) {
+            DDLogWarn(@"%@ ignoring INStartAudioCallIntent due to ongoing WebRTC call.", self.tag);
+            return NO;
+        }
+
+        OutboundCallInitiator *outboundCallInitiator = [Environment getCurrent].outboundCallInitiator;
+        OWSAssert(outboundCallInitiator);
+        return [outboundCallInitiator initiateCallWithHandle:handle];
+    } else {
+        DDLogWarn(@"%@ called %s with userActivity: %@, but not yet supported.",
+            self.tag,
+            __PRETTY_FUNCTION__,
+            userActivity.activityType);
+    }
+
+    // TODO Something like...
+    // *phoneNumber = [[[[[[userActivity interaction] intent] contacts] firstObject] personHandle] value]
+    // thread = blah
+    // [callUIAdapter startCall:thread]
+    //
+    // Here's the Speakerbox Example for intent / NSUserActivity handling:
+    //
+    //    func application(_ application: UIApplication, continue userActivity: NSUserActivity, restorationHandler: @escaping ([Any]?) -> Void) -> Bool {
+    //        guard let handle = userActivity.startCallHandle else {
+    //            print("Could not determine start call handle from user activity: \(userActivity)")
+    //            return false
+    //        }
+    //
+    //        guard let video = userActivity.video else {
+    //            print("Could not determine video from user activity: \(userActivity)")
+    //            return false
+    //        }
+    //
+    //        callManager.startCall(handle: handle, video: video)
+    //        return true
+    //    }
+    return NO;
+}
+
 
 /**
  * Screen protection obscures the app screen shown in the app switcher.

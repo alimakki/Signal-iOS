@@ -40,6 +40,9 @@
 /* No comment provided by engineer. */
 "APN_MESSAGE_IN_GROUP_DETAILED" = "%@ dans le groupe %@: %@";
 
+/* Name of application */
+"APPLICATION_NAME" = "Signal";
+
 /* Pressing this button moves a thread from the inbox to the archive */
 "ARCHIVE_ACTION" = "Archiver";
 
@@ -65,12 +68,21 @@
 "ATTACHMENT_QUEUED" = "Nouvelle pièce jointe prête à télécharger.";
 
 /* No comment provided by engineer. */
-"AUDIO_PERMISSION_MESSAGE" = "Signal doit avoir accès au micro pour fonctionner correctement. Vous pouvez réinitialiser les droits d'accès dans Réglages >> Confidentialité >> Micro >> Signal";
+"AUDIO_PERMISSION_MESSAGE" = "Le signal nécessite l'accès à votre microphone pour fonctionner correctement. Vous pouvez accorder cette autorisation dans l'application Paramètres >> Confidentialité >> Microphone >> Signal";
+
+/* Title for call interstitial view */
+"CALL_INTERSTITIAL_CALLING_LABEL" = "Appel...";
 
 /* Accessibilty label for placing call button */
 "CALL_LABEL" = "Appel";
 
-/* No comment provided by engineer. */
+/* Call setup status label after outgoing call times out */
+"CALL_SCREEN_STATUS_NO_ANSWER" = "Pas de réponse.";
+
+/* embeds {{Call Status}} in call screen label. For ongoing calls, {{Call Status}} is a seconds timer like 01:23, otherwise {{Call Status}} is a short text like 'Ringing', 'Busy', or 'Failed Call' */
+"CALL_STATUS_FORMAT" = "Signal %@";
+
+/* notification action */
 "CALLBACK_BUTTON_TITLE" = "Appeler en retour";
 
 /* Activity Sheet label */
@@ -220,14 +232,14 @@
 /* No comment provided by engineer. */
 "END_CALL_REPLACED_BY_NEXT" = "Un nouvel appel a été effectué.";
 
-/* No comment provided by engineer. */
-"END_CALL_RESPONDER_IS_BUSY" = "Occupé…";
+/* Call setup status label */
+"END_CALL_RESPONDER_IS_BUSY" = "Occupé.";
 
 /* No comment provided by engineer. */
 "END_CALL_STALE_SESSION" = "Appel manqué.";
 
-/* No comment provided by engineer. */
-"END_CALL_UNCATEGORIZED_FAILURE" = "Erreur du client !";
+/* Call setup status label */
+"END_CALL_UNCATEGORIZED_FAILURE" = "Appel echoué";
 
 /* Generic notice when message failed to send. */
 "ERROR_DESCRIPTION_CLIENT_SENDING_FAILURE" = "Échec de l'envoi du message.";
@@ -241,8 +253,11 @@
 /* Generic server error */
 "ERROR_DESCRIPTION_SERVER_FAILURE" = "Erreur serveur. Veuillez réessayer plus tard.";
 
+/* Worst case generic error message */
+"ERROR_DESCRIPTION_UNKNOWN_ERROR" = "Une erreur inconnue est survenue.";
+
 /* Error message when attempting to send message */
-"ERROR_DESCRIPTION_UNREGISTERED_RECIPIENT" = "Le destinataire n'est plus un utilisateur Signal.";
+"ERROR_DESCRIPTION_UNREGISTERED_RECIPIENT" = "Le contact n'est pas un utilisateur Signal.";
 
 /* No comment provided by engineer. */
 "ERROR_MESSAGE_DUPLICATE_MESSAGE" = "Réception d'un message en double.";
@@ -353,13 +368,16 @@
 "IN_CALL_TALKING" = "Sécurisé. Actif.";
 
 /* Call setup status label */
-"IN_CALL_TERMINATED" = "Terminé.";
+"IN_CALL_TERMINATED" = "Appel terminé.";
 
-/* No comment provided by engineer. */
+/* notification body */
 "INCOMING_CALL" = "Appel entrant";
 
-/* No comment provided by engineer. */
+/* notification body */
 "INCOMING_CALL_FROM" = "Appel entrant de %@";
+
+/* No comment provided by engineer. */
+"INCOMING_INCOMPLETE_CALL" = "Incomplete incoming call from";
 
 /* Text for button at the top of the contact picker */
 "INVITE_FRIENDS_CONTACT_TABLE_BUTTON" = "Inviter des Amis à Signal";
@@ -439,23 +457,31 @@
 /* {{number of minutes}} embedded in strings, e.g. 'Alice updated disappearing messages expiration to {{5 minutes}}'. See other *_TIME_AMOUNT strings */
 "MINUTES_TIME_AMOUNT" = "%u minutes";
 
-/* No comment provided by engineer. */
+/* notification title */
 "MISSED_CALL" = "Appel manqué";
 
-/* Alert body */
-"MISSING_CAMERA_PERMISSION_MESSAGE" = "Vous avez refusé de laisser Signal accéder à votre caméra. Mettez à jour vos paramètres système pour continuer.";
+/* Alert body
+   Alert body when camera is not authorized */
+"MISSING_CAMERA_PERMISSION_MESSAGE" = "Signal doit avoir accès à votre caméra pour les appels vidéo. Vous pouvez accorder cette autorisation dans l'application Paramètres >> Confidentialité >> Appareil photo >> Signal";
 
-/* Alert title */
+/* Alert title
+   Alert title when camera is not authorized */
 "MISSING_CAMERA_PERMISSION_TITLE" = "Signal a besoin d'accéder à votre appareil photo.";
 
-/* No comment provided by engineer. */
+/* notification title. Embeds {{Caller's Name}} */
 "MSGVIEW_MISSED_CALL" = "Appel manqué de %@.";
 
 /* No comment provided by engineer. */
 "MSGVIEW_RECEIVED_CALL" = "Vous avez reçu un appel de %@.";
 
 /* No comment provided by engineer. */
+"MSGVIEW_THEY_TRIED_TO_CALL_YOU" = "%@ tried to call you.";
+
+/* No comment provided by engineer. */
 "MSGVIEW_YOU_CALLED" = "Vous avez appelé %@.";
+
+/* No comment provided by engineer. */
+"MSGVIEW_YOU_TRIED_TO_CALL" = "You tried to call %@.";
 
 /* No comment provided by engineer. */
 "MULTIDEVICE_PAIRING_MAX_DESC" = "Impossible d'ajouter d'autres appareils.";
@@ -481,6 +507,9 @@
 /* No comment provided by engineer. */
 "NETWORK_STATUS_TEXT" = "Vous pouvez vérifier l'état de votre connexion en regardant la barre au-dessus de la boîte de réception.";
 
+/* Text for button to start a new conversation with a non-contact */
+"NEW_CONVERSATION_FOR_NON_CONTACT_FORMAT" = "Nouvelle conversation avec %@";
+
 /* Action Sheet title prompting the user for a group avatar */
 "NEW_GROUP_ADD_PHOTO_ACTION" = "Définir la photo de groupe";
 
@@ -492,6 +521,9 @@
 
 /* No comment provided by engineer. */
 "NEW_GROUP_REQUEST_ADDPEOPLE" = "Ajouter quelqu'un";
+
+/* Label for a button that lets users search for contacts by phone number */
+"NO_CONTACTS_SEARCH_BY_PHONE_NUMBER" = "Trouver des contacts par numéro de téléphone";
 
 /* No comment provided by engineer. */
 "NOTIFICATION_SEND_FAILED" = "L'envoi de votre message à %@ a échoué.";
@@ -536,7 +568,7 @@
 "OUTGOING_CALL" = "Appel sortant";
 
 /* No comment provided by engineer. */
-"PHONE_NEEDS_UNLOCK" = "Votre téléphone doit être déverrouillé pour recevoir de nouveaux messages.";
+"OUTGOING_INCOMPLETE_CALL" = "Incomplete outgoing call";
 
 /* Alert body when verifying with {{contact name}} */
 "PRIVACY_VERIFICATION_FAILED_I_HAVE_WRONG_KEY_FOR_THEM" = "Cela ne ressemble pas à votre numéro de sécurité avec %@. Avez-vous vérifier le bon contact?";
@@ -700,8 +732,8 @@
 /* Alert body after invite succeeded */
 "SEND_INVITE_SUCCESS" = "Vous avez invité vos amis à utiliser Signal!";
 
-/* No comment provided by engineer. */
-"SEND_SMS_BUTTON" = "Envoyer un SMS à :";
+/* Text for button to send a Signal invite via SMS. %@ is placeholder for the receipient's phone number. */
+"SEND_INVITE_VIA_SMS_BUTTON_FORMAT" = "Envoyer une invitation par SMS à %@";
 
 /* No comment provided by engineer. */
 "SEND_SMS_CONFIRM_TITLE" = "Inviter un ami via un SMS non sécurisé ?";
@@ -712,6 +744,9 @@
 /* Navbar title */
 "SETTINGS_ABOUT" = "A propos de";
 
+/* Short table cell label */
+"SETTINGS_ADVANCED_CALLKIT_TITLE" = "Utiliser CallKit";
+
 /* No comment provided by engineer. */
 "SETTINGS_ADVANCED_DEBUGLOG" = "Activer le log de débuggage";
 
@@ -720,6 +755,15 @@
 
 /* No comment provided by engineer. */
 "SETTINGS_ADVANCED_TITLE" = "Avancé";
+
+/* This setting is used to switch between new-style WebRTC calling and old-style RedPhone calling. */
+"SETTINGS_ADVANCED_WEBRTC" = "Activer l'appel vidéo (bêta)";
+
+/* The message of the alert shown when updates to the WebRTC property fail. */
+"SETTINGS_ADVANCED_WEBRTC_FAILED_MESSAGE" = "Impossible de mettre à jour vos préférences.";
+
+/* The title of the alert shown when updates to the WebRTC property fail. */
+"SETTINGS_ADVANCED_WEBRTC_FAILED_TITLE" = "Erreur";
 
 /* User settings section footer, a detailed explanation */
 "SETTINGS_BLOCK_ON_IDENITY_CHANGE_DETAIL" = "Nécessite votre approbation avant de communiquer avec quelqu'un qui a un nouveau numéro de sécurité, généralement à partir d'une réinstallation de Signal.";
@@ -775,6 +819,12 @@
 /* No comment provided by engineer. */
 "SETTINGS_SCREEN_SECURITY_DETAIL" = "Empêcher la prévisualisation Signal lors du basculement entre applications";
 
+/* Settings table section footer. */
+"SETTINGS_SECTION_CALL_KIT_DESCRIPTION" = "CallKit vous permet de répondre aux appels directement à partir de votre verrouillage. Sachez que lorsque vous utilisez CallKit, Apple synchronise certaines métadonnées d'appel avec votre compte iCloud.";
+
+/* settings topic header for table section */
+"SETTINGS_SECTION_TITLE_CALLING" = "Appel";
+
 /* Section header */
 "SETTINGS_SECURITY_TITLE" = "Sécurité écran";
 
@@ -825,6 +875,9 @@
 
 /* No comment provided by engineer. */
 "TXT_DELETE_TITLE" = "Effacer";
+
+/* Alert Title */
+"UNABLE_TO_PLACE_CALL" = "Impossible de placer l'appel.";
 
 /* Pressing this button moves an archived thread from the archive back to the inbox */
 "UNARCHIVE_ACTION" = "Récupérer";

@@ -1,3 +1,7 @@
+//
+//  Copyright (c) 2017 Open Whisper Systems. All rights reserved.
+//
+
 #import "PropertyListPreferences.h"
 #import "Constraints.h"
 #import "TSStorageHeaders.h"
@@ -19,6 +23,8 @@ NSString *const PropertyListPreferencesKeyPlaySoundInForeground = @"Notification
 NSString *const PropertyListPreferencesKeyHasRegisteredVoipPush = @"VOIPPushEnabled";
 NSString *const PropertyListPreferencesKeyLastRecordedPushToken = @"LastRecordedPushToken";
 NSString *const PropertyListPreferencesKeyLastRecordedVoipToken = @"LastRecordedVoipToken";
+NSString *const PropertyListPreferencesKeyWebRTCEnabled = @"WebRTCEnabled";
+NSString *const PropertyListPreferencesKeyCallKitEnabled = @"CallKitEnabled";
 
 @implementation PropertyListPreferences
 
@@ -115,6 +121,7 @@ NSString *const PropertyListPreferencesKeyLastRecordedVoipToken = @"LastRecorded
     [self setValueForKey:PropertyListPreferencesKeyScreenSecurity toValue:@(flag)];
 }
 
+
 - (void)setHasRegisteredVOIPPush:(BOOL)enabled
 {
     [self setValueForKey:PropertyListPreferencesKeyHasRegisteredVoipPush toValue:@(enabled)];
@@ -160,6 +167,35 @@ NSString *const PropertyListPreferencesKeyLastRecordedVoipToken = @"LastRecorded
                                             forKey:PropertyListPreferencesKeyLastRunSignalVersion];
     [NSUserDefaults.standardUserDefaults synchronize];
     return currentVersion;
+}
+
+#pragma mark - Calling
+
+#pragma mark WebRTC
+
+- (BOOL)isWebRTCEnabled
+{
+    NSNumber *preference = [self tryGetValueForKey:PropertyListPreferencesKeyWebRTCEnabled];
+    // Currently default to NO.
+    return preference ? [preference boolValue] : NO;
+}
+
+- (void)setIsWebRTCEnabled:(BOOL)flag
+{
+    [self setValueForKey:PropertyListPreferencesKeyWebRTCEnabled toValue:@(flag)];
+}
+
+#pragma mark CallKit
+
+- (BOOL)isCallKitEnabled
+{
+    NSNumber *preference = [self tryGetValueForKey:PropertyListPreferencesKeyCallKitEnabled];
+    return preference ? [preference boolValue] : YES;
+}
+
+- (void)setIsCallKitEnabled:(BOOL)flag
+{
+    [self setValueForKey:PropertyListPreferencesKeyCallKitEnabled toValue:@(flag)];
 }
 
 #pragma mark Notification Preferences
