@@ -37,7 +37,7 @@ final class CallKitCallUIAdaptee: NSObject, CallUIAdaptee, CXProviderDelegate {
 
         providerConfiguration.maximumCallsPerCallGroup = 1
 
-        providerConfiguration.supportedHandleTypes = [.phoneNumber]
+        providerConfiguration.supportedHandleTypes = [.phoneNumber, .generic]
 
         if let iconMaskImage = UIImage(named: "IconMask") {
             providerConfiguration.iconTemplateImageData = UIImagePNGRepresentation(iconMaskImage)
@@ -84,7 +84,7 @@ final class CallKitCallUIAdaptee: NSObject, CallUIAdaptee, CXProviderDelegate {
         AssertIsOnMainThread()
         Logger.debug("\(self.TAG) \(#function)")
 
-        switch (error) {
+        switch error {
         case .timeout(description: _):
             provider.reportCall(with: call.localId, endedAt: Date(), reason: CXCallEndedReason.unanswered)
         default:
@@ -100,8 +100,17 @@ final class CallKitCallUIAdaptee: NSObject, CallUIAdaptee, CXProviderDelegate {
 
         // Construct a CXCallUpdate describing the incoming call, including the caller.
         let update = CXCallUpdate()
-        update.remoteHandle = CXHandle(type: .phoneNumber, value: call.remotePhoneNumber)
+        if Environment.getCurrent().preferences.isCallKitPrivacyEnabled() {
+            let callKitId = CallKitCallManager.kAnonymousCallHandlePrefix + call.localId.uuidString
+            update.remoteHandle = CXHandle(type: .generic, value: callKitId)
+            TSStorageManager.shared().setPhoneNumber(call.remotePhoneNumber, forCallKitId:callKitId)
+        } else {
+            update.remoteHandle = CXHandle(type: .phoneNumber, value: call.remotePhoneNumber)
+        }
+
         update.hasVideo = call.hasLocalVideo
+        // Update the name used in the CallKit UI for incoming calls.
+        update.localizedCallerName = NSLocalizedString("CALLKIT_ANONYMOUS_CONTACT_NAME", comment: "The generic name used for calls if CallKit privacy is enabled")
         disableUnsupportedFeatures(callUpdate: update)
 
         // Report the incoming call to the system
@@ -192,7 +201,6 @@ final class CallKitCallUIAdaptee: NSObject, CallUIAdaptee, CXProviderDelegate {
         Logger.debug("\(self.TAG) \(#function)")
 
         let update = CXCallUpdate()
-        update.remoteHandle = CXHandle(type: .phoneNumber, value: call.remotePhoneNumber)
         update.hasVideo = hasLocalVideo
 
         // Update the CallKit UI.
@@ -212,7 +220,7 @@ final class CallKitCallUIAdaptee: NSObject, CallUIAdaptee, CXProviderDelegate {
 
         // End any ongoing calls if the provider resets, and remove them from the app's list of calls,
         // since they are no longer valid.
-        callService.handleFailedCall(error: .providerReset)
+        callService.handleFailedCurrentCall(error: .providerReset)
 
         // Remove all calls from the app's list of calls.
         callManager.removeAllCalls()
@@ -231,9 +239,19 @@ final class CallKitCallUIAdaptee: NSObject, CallUIAdaptee, CXProviderDelegate {
         // We can't wait for long before fulfilling the CXAction, else CallKit will show a "Failed Call". We don't 
         // actually need to wait for the outcome of the handleOutgoingCall promise, because it handles any errors by 
         // manually failing the call.
-        _ = self.callService.handleOutgoingCall(call)
+        let callPromise = self.callService.handleOutgoingCall(call)
+        callPromise.retainUntilComplete()
+
         action.fulfill()
         self.provider.reportOutgoingCall(with: call.localId, startedConnectingAt: nil)
+
+        if Environment.getCurrent().preferences.isCallKitPrivacyEnabled() {
+            // Update the name used in the CallKit UI for outgoing calls.
+            let update = CXCallUpdate()
+            update.localizedCallerName = NSLocalizedString("CALLKIT_ANONYMOUS_CONTACT_NAME",
+                                                           comment: "The generic name used for calls if CallKit privacy is enabled")
+            provider.reportCall(with: call.localId, updated: update)
+        }
     }
 
     func provider(_ provider: CXProvider, perform action: CXAnswerCallAction) {
@@ -256,6 +274,7 @@ final class CallKitCallUIAdaptee: NSObject, CallUIAdaptee, CXProviderDelegate {
 
         Logger.debug("\(TAG) Received \(#function) CXEndCallAction")
         guard let call = callManager.callWithLocalId(action.callUUID) else {
+            Logger.error("\(self.TAG) in \(#function) trying to end unknown call with localId: \(action.callUUID)")
             action.fail()
             return
         }
@@ -324,7 +343,7 @@ final class CallKitCallUIAdaptee: NSObject, CallUIAdaptee, CXProviderDelegate {
     func provider(_ provider: CXProvider, timedOutPerforming action: CXAction) {
         AssertIsOnMainThread()
 
-        Logger.debug("\(TAG) Timed out \(#function)")
+        Logger.debug("\(TAG) Timed out \(#function) while performing \(action)")
 
         // React to the action timeout if necessary, such as showing an error UI.
     }

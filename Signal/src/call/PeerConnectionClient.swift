@@ -108,6 +108,7 @@ class PeerConnectionClient: NSObject, RTCPeerConnectionDelegate, RTCDataChannelD
 
     // Video
 
+    private var videoCaptureSession: AVCaptureSession?
     private var videoSender: RTCRtpSender?
     private var localVideoTrack: RTCVideoTrack?
     // RTCVideoTrack is fragile and prone to throwing exceptions and/or
@@ -120,7 +121,7 @@ class PeerConnectionClient: NSObject, RTCPeerConnectionDelegate, RTCDataChannelD
     private var remoteVideoTrack: RTCVideoTrack?
     private var cameraConstraints: RTCMediaConstraints
 
-    init(iceServers: [RTCIceServer], delegate: PeerConnectionClientDelegate, callDirection: CallDirection) {
+    init(iceServers: [RTCIceServer], delegate: PeerConnectionClientDelegate, callDirection: CallDirection, useTurnOnly: Bool) {
         AssertIsOnMainThread()
 
         self.iceServers = iceServers
@@ -130,6 +131,12 @@ class PeerConnectionClient: NSObject, RTCPeerConnectionDelegate, RTCDataChannelD
         configuration.iceServers = iceServers
         configuration.bundlePolicy = .maxBundle
         configuration.rtcpMuxPolicy = .require
+        if useTurnOnly {
+            Logger.debug("\(TAG) using iceTransportPolicy: relay")
+            configuration.iceTransportPolicy = .relay
+        } else {
+            Logger.debug("\(TAG) using iceTransportPolicy: default")
+        }
 
         let connectionConstraintsDict = ["DtlsSrtpKeyAgreement": "true"]
         connectionConstraints = RTCMediaConstraints(mandatoryConstraints: nil, optionalConstraints: connectionConstraintsDict)
@@ -159,8 +166,11 @@ class PeerConnectionClient: NSObject, RTCPeerConnectionDelegate, RTCDataChannelD
     private func createSignalingDataChannel() {
         AssertIsOnMainThread()
 
+        let configuration = RTCDataChannelConfiguration()
+        // Insist upon an "ordered" TCP data channel for delivery reliability.
+        configuration.isOrdered = true
         let dataChannel = peerConnection.dataChannel(forLabel: Identifiers.dataChannelSignaling.rawValue,
-                                                     configuration: RTCDataChannelConfiguration())
+                                                     configuration: configuration)
         dataChannel.delegate = self
 
         assert(self.dataChannel == nil)
@@ -186,7 +196,9 @@ class PeerConnectionClient: NSObject, RTCPeerConnectionDelegate, RTCDataChannelD
 
         // TODO: Revisit the cameraConstraints.
         let videoSource = factory.avFoundationVideoSource(with: cameraConstraints)
+        self.videoCaptureSession = videoSource.captureSession
         videoSource.useBackCamera = false
+
         let localVideoTrack = factory.videoTrack(with: videoSource, trackId: Identifiers.videoTrack.rawValue)
         self.localVideoTrack = localVideoTrack
 
@@ -214,8 +226,21 @@ class PeerConnectionClient: NSObject, RTCPeerConnectionDelegate, RTCDataChannelD
                 Logger.error("\(self.TAG)) trying to \(action) videoTrack which doesn't exist")
                 return
             }
+            guard let videoCaptureSession = self.videoCaptureSession else {
+                Logger.error("\(self.TAG) videoCaptureSession was unexpectedly nil")
+                assertionFailure()
+                return
+            }
 
             localVideoTrack.isEnabled = enabled
+
+            if enabled {
+                Logger.debug("\(self.TAG) in \(#function) starting videoCaptureSession")
+                videoCaptureSession.startRunning()
+            } else {
+                Logger.debug("\(self.TAG) in \(#function) stopping videoCaptureSession")
+                videoCaptureSession.stopRunning()
+            }
 
             if let delegate = self.delegate {
                 DispatchQueue.main.async { [weak self, weak localVideoTrack] in
@@ -434,7 +459,7 @@ class PeerConnectionClient: NSObject, RTCPeerConnectionDelegate, RTCDataChannelD
         AssertIsOnMainThread()
         Logger.debug("\(TAG) in \(#function)")
 
-        PeerConnectionClient.signalingQueue.sync {
+        PeerConnectionClient.signalingQueue.async {
             assert(self.peerConnection != nil)
             self.terminateInternal()
         }
@@ -555,7 +580,7 @@ class PeerConnectionClient: NSObject, RTCPeerConnectionDelegate, RTCDataChannelD
         }
         let remoteVideoTrack = stream.videoTracks[0]
         Logger.debug("\(self.TAG) didAdd stream:\(stream) video tracks: \(stream.videoTracks.count) audio tracks: \(stream.audioTracks.count)")
-        
+
         // See the comments on the remoteVideoTrack property.
         //
         // We only set the remoteVideoTrack property if peerConnection is non-nil.
@@ -574,7 +599,7 @@ class PeerConnectionClient: NSObject, RTCPeerConnectionDelegate, RTCDataChannelD
             if let delegate = self.delegate {
                 DispatchQueue.main.async { [weak self] in
                     guard let strongSelf = self else { return }
-                    
+
                     // See the comments on the remoteVideoTrack property.
                     //
                     // We only access the remoteVideoTrack property if peerConnection is non-nil.
@@ -752,11 +777,13 @@ class HardenedRTCSessionDescription {
         var description = rtcSessionDescription.sdp
 
         // Enforce Constant bit rate.
-        description = description.replacingOccurrences(of: "(a=fmtp:111 ((?!cbr=).)*)\r?\n", with: "$1;cbr=1\r\n")
+        let cbrRegex = try! NSRegularExpression(pattern:"(a=fmtp:111 ((?!cbr=).)*)\r?\n", options:.caseInsensitive)
+        description = cbrRegex.stringByReplacingMatches(in: description, options: [], range: NSMakeRange(0, description.characters.count), withTemplate: "$1;cbr=1\r\n")
 
         // Strip plaintext audio-level details
         // https://tools.ietf.org/html/rfc6464
-        description = description.replacingOccurrences(of: ".+urn:ietf:params:rtp-hdrext:ssrc-audio-level.*\r?\n", with: "")
+        let audioLevelRegex = try! NSRegularExpression(pattern:".+urn:ietf:params:rtp-hdrext:ssrc-audio-level.*\r?\n", options:.caseInsensitive)
+        description = audioLevelRegex.stringByReplacingMatches(in: description, options: [], range: NSMakeRange(0, description.characters.count), withTemplate: "")
 
         return RTCSessionDescription.init(type: rtcSessionDescription.type, sdp: description)
     }

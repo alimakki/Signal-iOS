@@ -4,37 +4,39 @@
 
 #import "AppDelegate.h"
 #import "AppStoreRating.h"
-#import "CategorizingLogger.h"
 #import "CodeVerificationViewController.h"
 #import "DebugLogger.h"
 #import "Environment.h"
 #import "NotificationsManager.h"
 #import "OWSContactsManager.h"
+#import "OWSContactsSyncing.h"
 #import "OWSStaleNotificationObserver.h"
+#import "Pastelog.h"
 #import "PropertyListPreferences.h"
 #import "PushManager.h"
-#import "RPAccountManager.h"
+#import "RegistrationViewController.h"
 #import "Release.h"
+#import "SendExternalFileViewController.h"
 #import "Signal-Swift.h"
-#import "TSMessagesManager.h"
-#import "TSSocketManager.h"
-#import "TextSecureKitEnv.h"
 #import "VersionMigrations.h"
+#import "ViewControllerUtils.h"
 #import <AxolotlKit/SessionCipher.h>
-#import <PastelogKit/Pastelog.h>
-#import <PromiseKit/AnyPromise.h>
 #import <SignalServiceKit/OWSDisappearingMessagesJob.h>
+#import <SignalServiceKit/OWSFailedAttachmentDownloadsJob.h>
 #import <SignalServiceKit/OWSFailedMessagesJob.h>
 #import <SignalServiceKit/OWSIncomingMessageReadObserver.h>
 #import <SignalServiceKit/OWSMessageSender.h>
 #import <SignalServiceKit/TSAccountManager.h>
+#import <SignalServiceKit/TSMessagesManager.h>
 #import <SignalServiceKit/TSPreKeyManager.h>
+#import <SignalServiceKit/TSSocketManager.h>
+#import <SignalServiceKit/TSStorageManager+Calling.h>
+#import <SignalServiceKit/TextSecureKitEnv.h>
 
 @import WebRTC;
 @import Intents;
 
 NSString *const AppDelegateStoryboardMain = @"Main";
-NSString *const AppDelegateStoryboardRegistration = @"Registration";
 
 static NSString *const kInitialViewControllerIdentifier = @"UserInitialViewController";
 static NSString *const kURLSchemeSGNLKey                = @"sgnl";
@@ -45,6 +47,7 @@ static NSString *const kURLHostVerifyPrefix             = @"verify";
 @property (nonatomic, retain) UIWindow *screenProtectionWindow;
 @property (nonatomic) OWSIncomingMessageReadObserver *incomingMessageReadObserver;
 @property (nonatomic) OWSStaleNotificationObserver *staleNotificationObserver;
+@property (nonatomic) OWSContactsSyncing *contactsSyncing;
 
 @end
 
@@ -82,13 +85,15 @@ static NSString *const kURLHostVerifyPrefix             = @"verify";
     loggingIsEnabled = TRUE;
     [DebugLogger.sharedLogger enableTTYLogging];
 #elif RELEASE
-    loggingIsEnabled = Environment.preferences.loggingIsEnabled;
+    loggingIsEnabled = PropertyListPreferences.loggingIsEnabled;
 #endif
     if (loggingIsEnabled) {
         [DebugLogger.sharedLogger enableFileLogging];
     }
 
     DDLogWarn(@"%@ application: didFinishLaunchingWithOptions.", self.tag);
+
+    [AppVersion instance];
 
     // Set the seed the generator for rand().
     //
@@ -100,13 +105,7 @@ static NSString *const kURLHostVerifyPrefix             = @"verify";
     // XXX - careful when moving this. It must happen before we initialize TSStorageManager.
     [self verifyDBKeysAvailableBeforeBackgroundLaunch];
 
-    // Initializing env logger
-    CategorizingLogger *logger = [CategorizingLogger categorizingLogger];
-    [logger addLoggingCallback:^(NSString *category, id details, NSUInteger index){
-    }];
-
-    // Setting up environment
-    [Environment setCurrent:[Release releaseEnvironmentWithLogging:logger]];
+    [self setupEnvironment];
 
     [UIUtil applySignalAppearence];
     [[PushManager sharedManager] registerPushKitNotificationFuture];
@@ -115,26 +114,23 @@ static NSString *const kURLHostVerifyPrefix             = @"verify";
         return YES;
     }
 
-    if ([TSAccountManager isRegistered]) {
-        [Environment.getCurrent.contactsManager doAfterEnvironmentInitSetup];
-    }
-    [Environment.getCurrent initCallListener];
-
-    [self setupTSKitEnv];
-
-    UIStoryboard *storyboard;
-    if ([TSAccountManager isRegistered]) {
-        storyboard = [UIStoryboard storyboardWithName:AppDelegateStoryboardMain bundle:[NSBundle mainBundle]];
-    } else {
-        storyboard = [UIStoryboard storyboardWithName:AppDelegateStoryboardRegistration bundle:[NSBundle mainBundle]];
-    }
     self.window = [[UIWindow alloc] initWithFrame:[[UIScreen mainScreen] bounds]];
 
-    self.window.rootViewController = [storyboard instantiateInitialViewController];
+    if ([TSAccountManager isRegistered]) {
+        self.window.rootViewController = [[UIStoryboard main] instantiateInitialViewController];
+    } else {
+        RegistrationViewController *viewController = [RegistrationViewController new];
+        UINavigationController *navigationController =
+            [[UINavigationController alloc] initWithRootViewController:viewController];
+        navigationController.navigationBarHidden = YES;
+        self.window.rootViewController = navigationController;
+    }
+
     [self.window makeKeyAndVisible];
 
-    [VersionMigrations performUpdateCheck]; // this call must be made after environment has been initialized because in
-                                            // general upgrade may depend on environment
+    // performUpdateCheck must be invoked after Environment has been initialized because
+    // upgrade process may depend on Environment.
+    [VersionMigrations performUpdateCheck];
 
     // Accept push notification when app is not open
     NSDictionary *remoteNotif = launchOptions[UIApplicationLaunchOptionsRemoteNotificationKey];
@@ -147,72 +143,74 @@ static NSString *const kURLHostVerifyPrefix             = @"verify";
 
     // At this point, potentially lengthy DB locking migrations could be running.
     // Avoid blocking app launch by putting all further possible DB access in async thread.
-    UIApplicationState launchState = application.applicationState;
-    [[TSAccountManager sharedInstance] ifRegistered:YES runAsync:^{
-        if (launchState == UIApplicationStateInactive) {
-            DDLogWarn(@"The app was launched from inactive");
-            [TSSocketManager becomeActiveFromForeground];
-        } else if (launchState == UIApplicationStateBackground) {
-            DDLogWarn(@"The app was launched from being backgrounded");
-            [TSSocketManager becomeActiveFromBackgroundExpectMessage:NO];
-        } else {
-            DDLogWarn(@"The app was launched in an unknown way");
-        }
+    [[TSAccountManager sharedInstance]
+        ifRegistered:YES
+            runAsync:^{
+                DDLogInfo(
+                    @"%@ running post launch block for registered user: %@", self.tag, [TSAccountManager localNumber]);
 
-        RTCInitializeSSL();
+                [TSSocketManager requestSocketOpen];
 
-        [OWSSyncPushTokensJob runWithPushManager:[PushManager sharedManager]
-                                  accountManager:[Environment getCurrent].accountManager
-                                     preferences:[Environment preferences]].then(^{
-            DDLogDebug(@"%@ Successfully ran syncPushTokensJob.", self.tag);
-        }).catch(^(NSError *_Nonnull error) {
-            DDLogDebug(@"%@ Failed to run syncPushTokensJob with error: %@", self.tag, error);
-        });
+                RTCInitializeSSL();
 
-        // Clean up any messages that expired since last launch.
-        [[[OWSDisappearingMessagesJob alloc] initWithStorageManager:[TSStorageManager sharedManager]] run];
+                [OWSSyncPushTokensJob runWithPushManager:[PushManager sharedManager]
+                                          accountManager:[Environment getCurrent].accountManager
+                                             preferences:[Environment preferences]
+                                              showAlerts:NO];
 
-        // Mark all "attempting out" messages as "unsent", i.e. any messages that were not successfully
-        // sent before the app exited should be marked as failures.
-        [[[OWSFailedMessagesJob alloc] initWithStorageManager:[TSStorageManager sharedManager]] run];
+                // Clean up any messages that expired since last launch immediately
+                // and continue cleaning in the background.
+                [[OWSDisappearingMessagesJob sharedJob] startIfNecessary];
 
-        [AppStoreRating setupRatingLibrary];
-    }];
+                // Mark all "attempting out" messages as "unsent", i.e. any messages that were not successfully
+                // sent before the app exited should be marked as failures.
+                [[[OWSFailedMessagesJob alloc] initWithStorageManager:[TSStorageManager sharedManager]] run];
+                [[[OWSFailedAttachmentDownloadsJob alloc] initWithStorageManager:[TSStorageManager sharedManager]] run];
+                
+                [AppStoreRating setupRatingLibrary];
+            }];
 
-    [[TSAccountManager sharedInstance] ifRegistered:NO runAsync:^{
-        dispatch_async(dispatch_get_main_queue(), ^{
-            UITapGestureRecognizer *gesture = [[UITapGestureRecognizer alloc] initWithTarget:[Pastelog class]
-                                                                                      action:@selector(submitLogs)];
-            gesture.numberOfTapsRequired = 8;
-            [self.window addGestureRecognizer:gesture];
-        });
-        RTCInitializeSSL();
-    }];
+    [[TSAccountManager sharedInstance]
+        ifRegistered:NO
+            runAsync:^{
+                dispatch_async(dispatch_get_main_queue(), ^{
+                    DDLogInfo(@"%@ running post launch block for unregistered user.", self.tag);
+                    [TSSocketManager requestSocketOpen];
+
+                    UITapGestureRecognizer *gesture =
+                        [[UITapGestureRecognizer alloc] initWithTarget:[Pastelog class] action:@selector(submitLogs)];
+                    gesture.numberOfTapsRequired = 8;
+                    [self.window addGestureRecognizer:gesture];
+                });
+                RTCInitializeSSL();
+            }];
+
+    self.contactsSyncing = [[OWSContactsSyncing alloc] initWithContactsManager:[Environment getCurrent].contactsManager
+                                                                 messageSender:[Environment getCurrent].messageSender];
 
     return YES;
 }
 
-- (void)setupTSKitEnv {
+- (void)setupEnvironment
+{
+    [Environment setCurrent:[Release releaseEnvironment]];
+
     // Encryption/Descryption mutates session state and must be synchronized on a serial queue.
-    [SessionCipher setSessionCipherDispatchQueue:[OWSDispatch sessionCipher]];
+    [SessionCipher setSessionCipherDispatchQueue:[OWSDispatch sessionStoreQueue]];
 
     TextSecureKitEnv *sharedEnv =
         [[TextSecureKitEnv alloc] initWithCallMessageHandler:[Environment getCurrent].callMessageHandler
                                              contactsManager:[Environment getCurrent].contactsManager
-                                        notificationsManager:[Environment getCurrent].notificationsManager];
+                                               messageSender:[Environment getCurrent].messageSender
+                                        notificationsManager:[Environment getCurrent].notificationsManager
+                                                 preferences:[Environment getCurrent].preferences];
     [TextSecureKitEnv setSharedEnv:sharedEnv];
 
     [[TSStorageManager sharedManager] setupDatabase];
 
-    OWSMessageSender *messageSender =
-        [[OWSMessageSender alloc] initWithNetworkManager:[Environment getCurrent].networkManager
-                                          storageManager:[TSStorageManager sharedManager]
-                                         contactsManager:[Environment getCurrent].contactsManager
-                                         contactsUpdater:[Environment getCurrent].contactsUpdater];
-
     self.incomingMessageReadObserver =
         [[OWSIncomingMessageReadObserver alloc] initWithStorageManager:[TSStorageManager sharedManager]
-                                                         messageSender:messageSender];
+                                                         messageSender:[Environment getCurrent].messageSender];
     [self.incomingMessageReadObserver startObserving];
 
     self.staleNotificationObserver = [OWSStaleNotificationObserver new];
@@ -230,7 +228,7 @@ static NSString *const kURLHostVerifyPrefix             = @"verify";
     DDLogError(@"%@ Failed to register for remote notifications with error %@", self.tag, error);
 #ifdef DEBUG
     DDLogWarn(@"%@ We're in debug mode. Faking success for remote registration with a fake push identifier", self.tag);
-    [PushManager.sharedManager.pushNotificationFutureSource trySetResult:[NSData dataWithLength:32]];
+    [PushManager.sharedManager.pushNotificationFutureSource trySetResult:[[NSMutableData dataWithLength:32] copy]];
 #else
     [PushManager.sharedManager.pushNotificationFutureSource trySetFailure:error];
 #endif
@@ -263,6 +261,122 @@ static NSString *const kURLHostVerifyPrefix             = @"verify";
         } else {
             DDLogWarn(@"Application opened with an unknown URL action: %@", url.host);
         }
+    } else if ([url.scheme.lowercaseString isEqualToString:@"file"]) {
+
+        if ([Environment getCurrent].callService.call != nil) {
+            DDLogWarn(@"%@ ignoring 'open with Signal' due to ongoing WebRTC call.", self.tag);
+            return NO;
+        }
+
+        NSString *filename = url.lastPathComponent;
+        if ([filename stringByDeletingPathExtension].length < 1) {
+            DDLogError(@"Application opened with URL invalid filename: %@", url);
+            [OWSAlerts showAlertWithTitle:
+                           NSLocalizedString(@"EXPORT_WITH_SIGNAL_ERROR_TITLE",
+                               @"Title for the alert indicating the 'export with signal' attachment had an error.")
+                                  message:NSLocalizedString(@"EXPORT_WITH_SIGNAL_ERROR_MESSAGE_INVALID_FILENAME",
+                                              @"Message for the alert indicating the 'export with signal' file had an "
+                                              @"invalid filename.")];
+            return NO;
+        }
+        NSString *fileExtension = [filename pathExtension];
+        if (fileExtension.length < 1) {
+            DDLogError(@"Application opened with URL missing file extension: %@", url);
+            [OWSAlerts showAlertWithTitle:
+                           NSLocalizedString(@"EXPORT_WITH_SIGNAL_ERROR_TITLE",
+                               @"Title for the alert indicating the 'export with signal' attachment had an error.")
+                                  message:NSLocalizedString(@"EXPORT_WITH_SIGNAL_ERROR_MESSAGE_UNKNOWN_TYPE",
+                                              @"Message for the alert indicating the 'export with signal' file had "
+                                              @"unknown type.")];
+            return NO;
+        }
+        
+        
+        NSString *utiType;
+        NSError *typeError;
+        [url getResourceValue:&utiType forKey:NSURLTypeIdentifierKey error:&typeError];
+        if (typeError) {
+            DDLogError(
+                       @"%@ Determining type of picked document at url: %@ failed with error: %@", self.tag, url, typeError);
+            OWSAssert(NO);
+        }
+        if (!utiType) {
+            DDLogDebug(@"%@ falling back to default filetype for picked document at url: %@", self.tag, url);
+            OWSAssert(NO);
+            utiType = (__bridge NSString *)kUTTypeData;
+        }
+        
+        NSNumber *isDirectory;
+        NSError *isDirectoryError;
+        [url getResourceValue:&isDirectory forKey:NSURLIsDirectoryKey error:&isDirectoryError];
+        if (isDirectoryError) {
+            DDLogError(@"%@ Determining if picked document at url: %@ was a directory failed with error: %@",
+                       self.tag,
+                       url,
+                       isDirectoryError);
+            OWSAssert(NO);
+            return NO;
+        } else if ([isDirectory boolValue]) {
+            DDLogInfo(@"%@ User picked directory at url: %@", self.tag, url);
+            DDLogError(@"Application opened with URL of unknown UTI type: %@", url);
+            [OWSAlerts
+                showAlertWithTitle:
+                    NSLocalizedString(@"ATTACHMENT_PICKER_DOCUMENTS_PICKED_DIRECTORY_FAILED_ALERT_TITLE",
+                        @"Alert title when picking a document fails because user picked a directory/bundle")
+                           message:
+                               NSLocalizedString(@"ATTACHMENT_PICKER_DOCUMENTS_PICKED_DIRECTORY_FAILED_ALERT_BODY",
+                                   @"Alert body when picking a document fails because user picked a directory/bundle")];
+            return NO;
+        }
+        
+        NSData *data = [NSData dataWithContentsOfURL:url];
+        if (!data) {
+            DDLogError(@"Application opened with URL with unloadable content: %@", url);
+            [OWSAlerts showAlertWithTitle:
+                           NSLocalizedString(@"EXPORT_WITH_SIGNAL_ERROR_TITLE",
+                               @"Title for the alert indicating the 'export with signal' attachment had an error.")
+                                  message:NSLocalizedString(@"EXPORT_WITH_SIGNAL_ERROR_MESSAGE_MISSING_DATA",
+                                              @"Message for the alert indicating the 'export with signal' data "
+                                              @"couldn't be loaded.")];
+            return NO;
+        }
+        SignalAttachment *attachment = [SignalAttachment attachmentWithData:data dataUTI:utiType filename:filename];
+        if (!attachment) {
+            DDLogError(@"Application opened with URL with invalid content: %@", url);
+            [OWSAlerts showAlertWithTitle:
+                           NSLocalizedString(@"EXPORT_WITH_SIGNAL_ERROR_TITLE",
+                               @"Title for the alert indicating the 'export with signal' attachment had an error.")
+                                  message:NSLocalizedString(@"EXPORT_WITH_SIGNAL_ERROR_MESSAGE_MISSING_ATTACHMENT",
+                                              @"Message for the alert indicating the 'export with signal' attachment "
+                                              @"couldn't be loaded.")];
+            return NO;
+        }
+        if ([attachment hasError]) {
+            DDLogError(@"Application opened with URL with content error: %@ %@", url, [attachment errorName]);
+            [OWSAlerts showAlertWithTitle:
+                           NSLocalizedString(@"EXPORT_WITH_SIGNAL_ERROR_TITLE",
+                               @"Title for the alert indicating the 'export with signal' attachment had an error.")
+                                  message:[attachment errorName]];
+            return NO;
+        }
+        DDLogInfo(@"Application opened with URL: %@", url);
+
+        [[TSAccountManager sharedInstance]
+            ifRegistered:YES
+                runAsync:^{
+                    dispatch_async(dispatch_get_main_queue(), ^{
+                        SendExternalFileViewController *viewController = [SendExternalFileViewController new];
+                        viewController.attachment = attachment;
+                        UINavigationController *navigationController =
+                            [[UINavigationController alloc] initWithRootViewController:viewController];
+                        [[[Environment getCurrent] signalsViewController]
+                            presentTopLevelModalViewController:navigationController
+                                              animateDismissal:NO
+                                           animatePresentation:YES];
+                    });
+                }];
+
+        return YES;
     } else {
         DDLogWarn(@"Application opened with an unknown URL scheme: %@", url.scheme);
     }
@@ -281,9 +395,13 @@ static NSString *const kURLHostVerifyPrefix             = @"verify";
                                                // We're double checking that the app is active, to be sure since we
                                                // can't verify in production env due to code
                                                // signing.
-                                               [TSSocketManager becomeActiveFromForeground];
-                                               [[Environment getCurrent].contactsManager verifyABPermission];
-                                               
+                                               [TSSocketManager requestSocketOpen];
+
+                                               dispatch_async(dispatch_get_main_queue(), ^{
+                                                   [[Environment getCurrent]
+                                                           .contactsManager fetchSystemContactsIfAlreadyAuthorized];
+                                               });
+
                                                // This will fetch new messages, if we're using domain
                                                // fronting.
                                                [[PushManager sharedManager] applicationDidBecomeActive];
@@ -291,38 +409,27 @@ static NSString *const kURLHostVerifyPrefix             = @"verify";
     
     [self removeScreenProtection];
 
-    static BOOL hasCheckedPrekeys = NO;
-    if (!hasCheckedPrekeys) {
-        // Always check prekeys after app launches...
-        [TSPreKeyManager refreshPreKeys];
-        hasCheckedPrekeys = YES;
-    } else {
-        // ...and sometimes check on app activation.
-        [TSPreKeyManager checkPreKeysIfNecessary];
-    }
+    // Always check prekeys after app launches, and sometimes check on app activation.
+    [TSPreKeyManager checkPreKeysIfNecessary];
 }
 
 - (void)applicationWillResignActive:(UIApplication *)application {
     DDLogWarn(@"%@ applicationWillResignActive.", self.tag);
-    
-    UIBackgroundTaskIdentifier __block bgTask = UIBackgroundTaskInvalid;
-    bgTask                                    = [application beginBackgroundTaskWithExpirationHandler:^{
 
-    }];
-
+    UIBackgroundTaskIdentifier bgTask = [application beginBackgroundTaskWithExpirationHandler:nil];
     dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
-      if ([TSAccountManager isRegistered]) {
-          dispatch_sync(dispatch_get_main_queue(), ^{
-              [self protectScreen];
-              [[[Environment getCurrent] signalsViewController] updateInboxCountLabel];
-              [TSSocketManager resignActivity];
-          });
-      }
-
-      [application endBackgroundTask:bgTask];
-      bgTask = UIBackgroundTaskInvalid;
+        if ([TSAccountManager isRegistered]) {
+            dispatch_async(dispatch_get_main_queue(), ^{
+                if ([UIApplication sharedApplication].applicationState != UIApplicationStateActive) {
+                    // If app has not re-entered active, show screen protection if necessary.
+                    [self showScreenProtection];
+                }
+                [[[Environment getCurrent] signalsViewController] updateInboxCountLabel];
+                [application endBackgroundTask:bgTask];
+            });
+        }
     });
-    
+
     [DDLog flushLog];
 }
 
@@ -379,9 +486,13 @@ static NSString *const kURLHostVerifyPrefix             = @"verify";
             return NO;
         }
 
-        if ([Environment getCurrent].phoneManager.hasOngoingRedphoneCall) {
-            DDLogWarn(@"%@ ignoring INStartVideoCallIntent due to ongoing RedPhone call.", self.tag);
-            return NO;
+        NSString *_Nullable phoneNumber = handle;
+        if ([handle hasPrefix:CallKitCallManager.kAnonymousCallHandlePrefix]) {
+            phoneNumber = [[TSStorageManager sharedManager] phoneNumberForCallKitId:handle];
+            if (phoneNumber.length < 1) {
+                DDLogWarn(@"%@ ignoring attempt to initiate video call to unknown anonymous signal user.", self.tag);
+                return NO;
+            }
         }
 
         // This intent can be received from more than one user interaction.
@@ -393,7 +504,7 @@ static NSString *const kURLHostVerifyPrefix             = @"verify";
         //   contacts app.  If so, the correct response is to try to initiate a new call
         //   to that user - unless there already is another call in progress.
         if ([Environment getCurrent].callService.call != nil) {
-            if ([handle isEqualToString:[Environment getCurrent].callService.call.remotePhoneNumber]) {
+            if ([phoneNumber isEqualToString:[Environment getCurrent].callService.call.remotePhoneNumber]) {
                 DDLogWarn(@"%@ trying to upgrade ongoing call to video.", self.tag);
                 [[Environment getCurrent].callService handleCallKitStartVideo];
                 return YES;
@@ -406,7 +517,7 @@ static NSString *const kURLHostVerifyPrefix             = @"verify";
 
         OutboundCallInitiator *outboundCallInitiator = [Environment getCurrent].outboundCallInitiator;
         OWSAssert(outboundCallInitiator);
-        return [outboundCallInitiator initiateCallWithHandle:handle];
+        return [outboundCallInitiator initiateCallWithHandle:phoneNumber];
     } else if ([userActivity.activityType isEqualToString:@"INStartAudioCallIntent"]) {
 
         if (!SYSTEM_VERSION_GREATER_THAN_OR_EQUAL_TO(10, 0)) {
@@ -430,10 +541,15 @@ static NSString *const kURLHostVerifyPrefix             = @"verify";
             return NO;
         }
 
-        if ([Environment getCurrent].phoneManager.hasOngoingRedphoneCall) {
-            DDLogWarn(@"%@ ignoring INStartAudioCallIntent due to ongoing RedPhone call.", self.tag);
-            return NO;
+        NSString *_Nullable phoneNumber = handle;
+        if ([handle hasPrefix:CallKitCallManager.kAnonymousCallHandlePrefix]) {
+            phoneNumber = [[TSStorageManager sharedManager] phoneNumberForCallKitId:handle];
+            if (phoneNumber.length < 1) {
+                DDLogWarn(@"%@ ignoring attempt to initiate audio call to unknown anonymous signal user.", self.tag);
+                return NO;
+            }
         }
+
         if ([Environment getCurrent].callService.call != nil) {
             DDLogWarn(@"%@ ignoring INStartAudioCallIntent due to ongoing WebRTC call.", self.tag);
             return NO;
@@ -441,7 +557,7 @@ static NSString *const kURLHostVerifyPrefix             = @"verify";
 
         OutboundCallInitiator *outboundCallInitiator = [Environment getCurrent].outboundCallInitiator;
         OWSAssert(outboundCallInitiator);
-        return [outboundCallInitiator initiateCallWithHandle:handle];
+        return [outboundCallInitiator initiateCallWithHandle:phoneNumber];
     } else {
         DDLogWarn(@"%@ called %s with userActivity: %@, but not yet supported.",
             self.tag,
@@ -491,16 +607,15 @@ static NSString *const kURLHostVerifyPrefix             = @"verify";
     self.screenProtectionWindow = window;
 }
 
-- (void)protectScreen {
+- (void)showScreenProtection
+{
     if (Environment.preferences.screenSecurityIsEnabled) {
         self.screenProtectionWindow.hidden = NO;
     }
 }
 
 - (void)removeScreenProtection {
-    if (Environment.preferences.screenSecurityIsEnabled) {
-        self.screenProtectionWindow.hidden = YES;
-    }
+    self.screenProtectionWindow.hidden = YES;
 }
 
 #pragma mark Push Notifications Delegate Methods

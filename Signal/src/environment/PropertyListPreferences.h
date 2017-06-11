@@ -2,6 +2,8 @@
 //  Copyright (c) 2017 Open Whisper Systems. All rights reserved.
 //
 
+#import <SignalServiceKit/TSPreferences.h>
+
 NS_ASSUME_NONNULL_BEGIN
 
 /**
@@ -13,18 +15,11 @@ typedef NS_ENUM(NSUInteger, NotificationType) {
     NotificationNamePreview,
 };
 
-typedef NS_ENUM(NSUInteger, TSImageQuality) {
-    TSImageQualityUncropped = 1,
-    TSImageQualityHigh = 2,
-    TSImageQualityMedium = 3,
-    TSImageQualityLow = 4
-};
-
 // Used when migrating logging to NSUserDefaults.
 extern NSString *const PropertyListPreferencesSignalDatabaseCollection;
 extern NSString *const PropertyListPreferencesKeyEnableDebugLog;
 
-@interface PropertyListPreferences : NSObject
+@interface PropertyListPreferences : NSObject <TSPreferences>
 
 #pragma mark - Helpers
 
@@ -43,8 +38,8 @@ extern NSString *const PropertyListPreferencesKeyEnableDebugLog;
 - (BOOL)getHasArchivedAMessage;
 - (void)setHasArchivedAMessage:(BOOL)enabled;
 
-- (BOOL)loggingIsEnabled;
-- (void)setLoggingEnabled:(BOOL)flag;
++ (BOOL)loggingIsEnabled;
++ (void)setLoggingEnabled:(BOOL)flag;
 
 - (BOOL)screenSecurityIsEnabled;
 - (void)setScreenSecurity:(BOOL)flag;
@@ -59,27 +54,37 @@ extern NSString *const PropertyListPreferencesKeyEnableDebugLog;
 - (BOOL)hasRegisteredVOIPPush;
 - (void)setHasRegisteredVOIPPush:(BOOL)enabled;
 
-- (TSImageQuality)imageUploadQuality;
++ (nullable NSString *)lastRanVersion;
++ (NSString *)setAndGetCurrentVersion;
 
-- (nullable NSString *)lastRanVersion;
-- (NSString *)setAndGetCurrentVersion;
+- (BOOL)hasDeclinedNoContactsView;
+- (void)setHasDeclinedNoContactsView:(BOOL)value;
+
+- (void)setIOSUpgradeNagVersion:(NSString *)value;
+- (nullable NSString *)iOSUpgradeNagVersion;
 
 #pragma mark - Calling
-
-#pragma mark WebRTC
-
-- (BOOL)isWebRTCEnabled;
-- (void)setIsWebRTCEnabled:(BOOL)flag;
 
 #pragma mark Callkit
 
 - (BOOL)isCallKitEnabled;
 - (void)setIsCallKitEnabled:(BOOL)flag;
+// Returns YES IFF isCallKitEnabled has been set by user.
+- (BOOL)isCallKitEnabledSet;
+
+- (BOOL)isCallKitPrivacyEnabled;
+- (void)setIsCallKitPrivacyEnabled:(BOOL)flag;
+// Returns YES IFF isCallKitPrivacyEnabled has been set by user.
+- (BOOL)isCallKitPrivacySet;
+
+#pragma mark direct call connectivity (non-TURN)
+
+- (BOOL)doCallsHideIPAddress;
+- (void)setDoCallsHideIPAddress:(BOOL)flag;
 
 #pragma mark - Block on Identity Change
 
-- (BOOL)shouldBlockOnIdentityChange;
-- (void)setShouldBlockOnIdentityChange:(BOOL)value;
+- (void)setIsSendingIdentityApprovalRequired:(BOOL)value;
 
 #pragma mark - Push Tokens
 

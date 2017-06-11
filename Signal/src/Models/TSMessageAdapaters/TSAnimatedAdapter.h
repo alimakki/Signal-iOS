@@ -1,25 +1,21 @@
 //
-//  TSAnimatedAdapter.h
-//  Signal
-//
-//  Created by Mike Okner (@mikeokner) on 2015-09-01.
-//  Copyright (c) 2015 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2017 Open Whisper Systems. All rights reserved.
 //
 
 #import "OWSMessageEditing.h"
+#import "OWSMessageMediaAdapter.h"
 #import <JSQMessagesViewController/JSQPhotoMediaItem.h>
+
+NS_ASSUME_NONNULL_BEGIN
 
 @class TSAttachmentStream;
 
-@interface TSAnimatedAdapter : JSQMediaItem <OWSMessageEditing>
+@interface TSAnimatedAdapter : JSQMediaItem <OWSMessageEditing, OWSMessageMediaAdapter>
 
-- (instancetype)initWithAttachment:(TSAttachmentStream *)attachment;
+@property (nonatomic, readonly) NSString *attachmentId;
 
-- (BOOL)isImage;
-- (BOOL)isAudio;
-- (BOOL)isVideo;
-
-@property NSString *attachmentId;
-@property NSData *fileData;
+- (instancetype)initWithAttachment:(TSAttachmentStream *)attachment incoming:(BOOL)incoming;
 
 @end
+
+NS_ASSUME_NONNULL_END

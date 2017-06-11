@@ -4,7 +4,6 @@
 
 #import "PropertyListPreferences.h"
 #import "TSStorageHeaders.h"
-#import <SignalServiceKit/TSPrivacyPreferences.h>
 
 NS_ASSUME_NONNULL_BEGIN
 
@@ -22,10 +21,26 @@ NSString *const PropertyListPreferencesKeyPlaySoundInForeground = @"Notification
 NSString *const PropertyListPreferencesKeyHasRegisteredVoipPush = @"VOIPPushEnabled";
 NSString *const PropertyListPreferencesKeyLastRecordedPushToken = @"LastRecordedPushToken";
 NSString *const PropertyListPreferencesKeyLastRecordedVoipToken = @"LastRecordedVoipToken";
-NSString *const PropertyListPreferencesKeyWebRTCEnabled = @"WebRTCEnabled";
 NSString *const PropertyListPreferencesKeyCallKitEnabled = @"CallKitEnabled";
+NSString *const PropertyListPreferencesKeyCallKitPrivacyEnabled = @"CallKitPrivacyEnabled";
+NSString *const PropertyListPreferencesKeyCallsHideIPAddress = @"CallsHideIPAddress";
+NSString *const PropertyListPreferencesKeyHasDeclinedNoContactsView = @"hasDeclinedNoContactsView";
+NSString *const PropertyListPreferencesKeyIOSUpgradeNagVersion = @"iOSUpgradeNagVersion";
+NSString *const PropertyListPreferencesKeyIsSendingIdentityApprovalRequired = @"IsSendingIdentityApprovalRequired";
 
 @implementation PropertyListPreferences
+
+- (instancetype)init
+{
+    self = [super init];
+    if (!self) {
+        return self;
+    }
+
+    OWSSingletonAssert();
+
+    return self;
+}
 
 #pragma mark - Helpers
 
@@ -50,11 +65,6 @@ NSString *const PropertyListPreferencesKeyCallKitEnabled = @"CallKitEnabled";
     [TSStorageManager.sharedManager setObject:value
                                        forKey:key
                                  inCollection:PropertyListPreferencesSignalDatabaseCollection];
-}
-
-- (TSPrivacyPreferences *)tsPrivacyPreferences
-{
-    return [TSPrivacyPreferences sharedInstance];
 }
 
 #pragma mark - Specific Preferences
@@ -109,12 +119,6 @@ NSString *const PropertyListPreferencesKeyCallKitEnabled = @"CallKitEnabled";
     }
 }
 
-- (TSImageQuality)imageUploadQuality
-{
-    // always return average image quality
-    return TSImageQualityMedium;
-}
-
 - (void)setScreenSecurity:(BOOL)flag
 {
     [self setValueForKey:PropertyListPreferencesKeyScreenSecurity toValue:@(flag)];
@@ -126,7 +130,7 @@ NSString *const PropertyListPreferencesKeyCallKitEnabled = @"CallKitEnabled";
     [self setValueForKey:PropertyListPreferencesKeyHasRegisteredVoipPush toValue:@(enabled)];
 }
 
-- (BOOL)loggingIsEnabled
++ (BOOL)loggingIsEnabled
 {
     NSNumber *preference = [NSUserDefaults.standardUserDefaults objectForKey:PropertyListPreferencesKeyEnableDebugLog];
 
@@ -137,15 +141,13 @@ NSString *const PropertyListPreferencesKeyCallKitEnabled = @"CallKitEnabled";
     }
 }
 
-- (void)setLoggingEnabled:(BOOL)flag
++ (void)setLoggingEnabled:(BOOL)flag
 {
+    // Logging preferences are stored in UserDefaults instead of the database, so that we can (optionally) start
+    // logging before the database is initialized. This is important because sometimes there are problems *with* the
+    // database initialization, and without logging it would be hard to track down.
     [NSUserDefaults.standardUserDefaults setObject:@(flag) forKey:PropertyListPreferencesKeyEnableDebugLog];
     [NSUserDefaults.standardUserDefaults synchronize];
-}
-
-- (nullable NSString *)lastRanVersion
-{
-    return [NSUserDefaults.standardUserDefaults objectForKey:PropertyListPreferencesKeyLastRunSignalVersion];
 }
 
 - (void)setHasSentAMessage:(BOOL)enabled
@@ -158,7 +160,12 @@ NSString *const PropertyListPreferencesKeyCallKitEnabled = @"CallKitEnabled";
     [self setValueForKey:PropertyListPreferencesKeyHasArchivedAMessage toValue:@(enabled)];
 }
 
-- (NSString *)setAndGetCurrentVersion
++ (nullable NSString *)lastRanVersion
+{
+    return [NSUserDefaults.standardUserDefaults objectForKey:PropertyListPreferencesKeyLastRunSignalVersion];
+}
+
++ (NSString *)setAndGetCurrentVersion
 {
     NSString *currentVersion =
         [NSString stringWithFormat:@"%@", NSBundle.mainBundle.infoDictionary[@"CFBundleVersion"]];
@@ -168,21 +175,29 @@ NSString *const PropertyListPreferencesKeyCallKitEnabled = @"CallKitEnabled";
     return currentVersion;
 }
 
-#pragma mark - Calling
-
-#pragma mark WebRTC
-
-- (BOOL)isWebRTCEnabled
+- (BOOL)hasDeclinedNoContactsView
 {
-    NSNumber *preference = [self tryGetValueForKey:PropertyListPreferencesKeyWebRTCEnabled];
-    // Currently default to NO.
+    NSNumber *preference = [self tryGetValueForKey:PropertyListPreferencesKeyHasDeclinedNoContactsView];
+    // Default to NO.
     return preference ? [preference boolValue] : NO;
 }
 
-- (void)setIsWebRTCEnabled:(BOOL)flag
+- (void)setHasDeclinedNoContactsView:(BOOL)value
 {
-    [self setValueForKey:PropertyListPreferencesKeyWebRTCEnabled toValue:@(flag)];
+    [self setValueForKey:PropertyListPreferencesKeyHasDeclinedNoContactsView toValue:@(value)];
 }
+
+- (void)setIOSUpgradeNagVersion:(NSString *)value
+{
+    [self setValueForKey:PropertyListPreferencesKeyIOSUpgradeNagVersion toValue:value];
+}
+
+- (nullable NSString *)iOSUpgradeNagVersion
+{
+    return [self tryGetValueForKey:PropertyListPreferencesKeyIOSUpgradeNagVersion];
+}
+
+#pragma mark - Calling
 
 #pragma mark CallKit
 
@@ -195,6 +210,44 @@ NSString *const PropertyListPreferencesKeyCallKitEnabled = @"CallKitEnabled";
 - (void)setIsCallKitEnabled:(BOOL)flag
 {
     [self setValueForKey:PropertyListPreferencesKeyCallKitEnabled toValue:@(flag)];
+}
+
+- (BOOL)isCallKitEnabledSet
+{
+    NSNumber *preference = [self tryGetValueForKey:PropertyListPreferencesKeyCallKitEnabled];
+    return preference != nil;
+}
+
+- (BOOL)isCallKitPrivacyEnabled
+{
+    NSNumber *preference = [self tryGetValueForKey:PropertyListPreferencesKeyCallKitPrivacyEnabled];
+    return preference ? [preference boolValue] : YES;
+}
+
+- (void)setIsCallKitPrivacyEnabled:(BOOL)flag
+{
+    [self setValueForKey:PropertyListPreferencesKeyCallKitPrivacyEnabled toValue:@(flag)];
+}
+
+- (BOOL)isCallKitPrivacySet
+{
+    NSNumber *preference = [self tryGetValueForKey:PropertyListPreferencesKeyCallKitPrivacyEnabled];
+    return preference != nil;
+}
+
+#pragma mark direct call connectivity (non-TURN)
+
+// Allow callers to connect directly, when desirable, vs. enforcing TURN only proxy connectivity
+
+- (BOOL)doCallsHideIPAddress
+{
+    NSNumber *preference = [self tryGetValueForKey:PropertyListPreferencesKeyCallsHideIPAddress];
+    return preference ? [preference boolValue] : NO;
+}
+
+- (void)setDoCallsHideIPAddress:(BOOL)flag
+{
+    [self setValueForKey:PropertyListPreferencesKeyCallsHideIPAddress toValue:@(flag)];
 }
 
 #pragma mark Notification Preferences
@@ -247,15 +300,19 @@ NSString *const PropertyListPreferencesKeyCallKitEnabled = @"CallKitEnabled";
 
 #pragma mark - Block on Identity Change
 
-- (BOOL)shouldBlockOnIdentityChange
+- (BOOL)isSendingIdentityApprovalRequired
 {
-    return self.tsPrivacyPreferences.shouldBlockOnIdentityChange;
+    NSNumber *preference = [self tryGetValueForKey:PropertyListPreferencesKeyIsSendingIdentityApprovalRequired];
+    if (preference) {
+        return [preference boolValue];
+    } else {
+        return NO;
+    }
 }
 
-- (void)setShouldBlockOnIdentityChange:(BOOL)value
+- (void)setIsSendingIdentityApprovalRequired:(BOOL)value
 {
-    self.tsPrivacyPreferences.shouldBlockOnIdentityChange = value;
-    [self.tsPrivacyPreferences save];
+    [self setValueForKey:PropertyListPreferencesKeyIsSendingIdentityApprovalRequired toValue:@(value)];
 }
 
 #pragma mark - Push Tokens
